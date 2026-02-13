@@ -4,10 +4,7 @@ End-to-end: 4-speaker overlap file → diarization → separation → transcript
 CPU only, ~2×RT on a 4-core laptop for a 5-min file.
 Usage:
     python diarize_separate_transcribe.py long_overlap.wav
-Output:
-    long_overlap.rttm        # who spoke when
-    long_overlap_<spk>.wav   # separated tracks
-    long_overlap.json        # list of dicts with {start, end, speaker, text}
+
 """
 import json, pathlib, sys, typing as tp
 import torch, torchaudio
@@ -29,9 +26,9 @@ MODEL_FS = 16000  # pyannote & whisper both use 16 kHz
 def diarize(wav_path: pathlib.Path):
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=os.getenv("HF_TOKEN")   # use env-var, not hard-coded
+        use_auth_token=os.getenv("HF_TOKEN")   
     ).to(torch.device("cpu"))
-    dz = pipeline(wav_path, num_speakers=4)   # force 4 clusters
+    dz = pipeline(wav_path, num_speakers=4)   
     turns = [(turn.start, turn.end, speaker)
                for turn, _, speaker in dz.itertracks(yield_label=True)]
     return sorted(turns, key=lambda x: x[0])
@@ -44,7 +41,7 @@ def separate_and_transcribe(
     waveform, fs = torchaudio.load(wav_path)
     if fs != MODEL_FS:
         waveform = torchaudio.functional.resample(waveform, fs, MODEL_FS)
-    model = whisper.load_model("base", device=DEVICE)  # small→faster, large→better
+    model = whisper.load_model("base", device=DEVICE)  
     results = []
     for idx, (start, end, spk) in enumerate(turns):
         seg = waveform[:, int(start*MODEL_FS):int(end*MODEL_FS)]
@@ -60,7 +57,7 @@ def separate_and_transcribe(
 def plot_diarization(turns: list, wav_path: pathlib.Path, save_path: pathlib.Path = None):
     """Simple timeline plot of speaker turns as dots."""
     speakers = sorted({spk for _, _, spk in turns})
-    cmap = plt.cm.get_cmap("tab10", len(speakers))  # Use the suggested way to get the colormap
+    cmap = plt.cm.get_cmap("tab10", len(speakers))  
     spk_color = {spk: cmap(i) for i, spk in enumerate(speakers)}
 
     fig, ax = plt.subplots(figsize=(10, 2))
@@ -76,7 +73,7 @@ def plot_diarization(turns: list, wav_path: pathlib.Path, save_path: pathlib.Pat
     plt.tight_layout()
     out_png = save_path or wav_path.with_suffix("") / (wav_path.stem + "_timeline.png")
     plt.savefig(out_png, dpi=150)
-    plt.show()  # This line will display the plot
+    plt.show()  
     plt.close()
     print(f"timeline plot saved → {out_png}")
 
@@ -89,7 +86,7 @@ def main():
     out.mkdir(exist_ok=True)
     print("1. Diarizing…")
     turns = diarize(wav)
-    plot_diarization(turns, wav)   # Plot the diarization result
+    plot_diarization(turns, wav)  
     with open(out / (wav.stem + ".rttm"), "w") as f:
         for s, e, spk in turns:
             f.write(f"SPEAKER {wav.stem} 1 {s:.3f} {e-s:.3f} <NA> <NA> {spk} <NA> <NA>\n")
@@ -101,4 +98,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
